@@ -23,19 +23,15 @@ const int BTN_PIN_Y = 21;
 const int LED_PIN_R = 5;
 const int LED_PIN_Y = 10;
 
-QueueHandle_t xQueueButId;
-SemaphoreHandle_t xSemaphore_r;
+QueueHandle_t xQueueBtn;
+SemaphoreHandle_t xSemaphoreLedR;
 
-SemaphoreHandle_t xSemaphore_y;
+SemaphoreHandle_t xSemaphoreLedY;
 
 void btn_callback(uint gpio, uint32_t events) {
     if (events == 0x4) { // fall edge
-        if (gpio == BTN_PIN_R) {
-            xSemaphoreGiveFromISR(xSemaphore_r, 0);
-        } 
-        else if (gpio == BTN_PIN_Y) {
-            xSemaphoreGiveFromISR(xSemaphore_y, 0);
-        }
+        int id = gpio;
+        xQueueSendFromISR(xQueueBtn, &id, 0);
     }
 }
 
@@ -45,7 +41,7 @@ void led_r_task(void* p) {
 
     int piscando = 0;
     while (true) {
-        if (xSemaphoreTake(xSemaphore_r, 0) == pdTRUE) {
+        if (xSemaphoreTake(xSemaphoreLedR, 0) == pdTRUE) {
             piscando = !piscando;
         }
 
@@ -66,7 +62,7 @@ void led_y_task(void* p) {
 
     int piscando = 0;
     while (true) {
-        if (xSemaphoreTake(xSemaphore_y, 0) == pdTRUE) {
+        if (xSemaphoreTake(xSemaphoreLedY, 0) == pdTRUE) {
             piscando = !piscando;
         }
 
@@ -94,11 +90,11 @@ void btn_task(void* p) {
 
     int id;
     while (true) {
-        if (xQueueReceive(xQueueButId, &id, portMAX_DELAY) == pdTRUE) {
+        if (xQueueReceive(xQueueBtn, &id, portMAX_DELAY) == pdTRUE) {
             if (id == BTN_PIN_R)
-                xSemaphoreGive(xSemaphore_r);
+                xSemaphoreGive(xSemaphoreLedR);
             else if (id == BTN_PIN_Y)
-                xSemaphoreGive(xSemaphore_y);
+                xSemaphoreGive(xSemaphoreLedY);
         }
     }
 }
@@ -108,10 +104,10 @@ int main() {
     stdio_init_all();
     printf("Start RTOS \n");
 
-    xQueueButId = xQueueCreate(32, sizeof(int));
-    xSemaphore_r = xSemaphoreCreateBinary();
+    xQueueBtn = xQueueCreate(32, sizeof(int));
+    xSemaphoreLedR = xSemaphoreCreateBinary();
 
-    xSemaphore_y = xSemaphoreCreateBinary();
+    xSemaphoreLedY = xSemaphoreCreateBinary();
 
     xTaskCreate(btn_task, "BTN_Task", 256, NULL, 1, NULL);
     xTaskCreate(led_r_task, "LED_Task R", 256, NULL, 1, NULL);
